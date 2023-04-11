@@ -12,8 +12,8 @@ const uint8_t LED_PIN        = PICO_DEFAULT_LED_PIN;
 const uint8_t TEST_OUTPUT_GP = 28;
 
 /* I'm using SPI1 for this test because it suits the project I have in mind */
-#define PICO_SPI_RX_PIN 12
-#define PICO_SPI_TX_PIN 15
+#define PICO_SPI_RX_PIN  12
+#define PICO_SPI_TX_PIN  15
 #define PICO_SPI_SCK_PIN 14
 #define PICO_SPI_CSN_PIN 13
 
@@ -24,12 +24,13 @@ const uint8_t TEST_OUTPUT_GP = 28;
 
 #define FLASH_STATUS_BUSY_MASK 0x01
 
-
+#define PRAM_CMD_WRITE         0x02
+#define PRAM_CMD_READ          0x03
 #define PRAM_CMD_RESET_ENABLE  0x66
 #define PRAM_CMD_RESET         0x99
 #define PRAM_CMD_READ_ID       0x9F
 
-#define RUN_READ_ID_TEST       1
+#define RUN_READ_ID_TEST       0
 
 static inline void cs_select(uint cs_pin) {
   gpio_put(cs_pin, 0);
@@ -136,9 +137,9 @@ int main()
   gpio_put(PICO_SPI_CSN_PIN, 1);   
 
 
-#if RUN_READ_ID_TEST
   while( 1 )
   {
+#if RUN_READ_ID_TEST
     cs_select(PICO_SPI_CSN_PIN);
 
     /* Read ID, on the chip I'm using takes 0x9F as the command followed by 3 "don't care"s */
@@ -156,36 +157,36 @@ int main()
     printf("Read result is 0x%04X, returned: 0x%02X\n", rr2, result);
 
     cs_deselect(PICO_SPI_CSN_PIN);
+#else
+    cs_select(PICO_SPI_CSN_PIN);
 
+    /* Write 4 data bytes into RAM at 0x000000 */
+    uint8_t write_cmd[] = { PRAM_CMD_WRITE,
+			    0, 0, 0,
+			    0xAA, 0xBB, 0xCC, 0xDD };
+    int wr = spi_write_blocking(spi1, write_cmd, sizeof(write_cmd));
+    printf("Write returned: 0x%04X\n", wr);
+
+    cs_deselect(PICO_SPI_CSN_PIN);
+
+
+    cs_select(PICO_SPI_CSN_PIN);
+
+    /* Read back 4 data bytes from 0x000000 */
+    uint8_t read_cmd[] = { PRAM_CMD_READ,
+			   0, 0, 0 };
+    wr = spi_write_blocking(spi1, read_cmd, sizeof(read_cmd));
+    printf("Write returned: 0x%04X\n", wr);
+
+    uint32_t result=0;
+    int rr = spi_read_blocking(spi1, 0, (uint8_t*)&result, 4 ); 
+    printf("Read result is 0x%04X, returned: 0x%08X\n", rr, result);
+
+    cs_deselect(PICO_SPI_CSN_PIN);
+#endif
     busy_wait_us_32(2000000);
+
   }
-#endif
-
-#if 0
-  uint8_t write_cmd[] = { 0x02,
-			  0, 0, 0,
-			  0xDF, 0xDF, 0xDF, 0xDF };
-  cs_select(PICO_DEFAULT_SPI_CSN_PIN);
-  wr = spi_write_blocking(spi1, write_cmd, 8);
-  cs_deselect(PICO_DEFAULT_SPI_CSN_PIN);
-
-  printf("Write returned: %d\n", wr);
-
-
-
-  uint8_t read_cmd2[] = { 0x03,
-			 0, 0, 0 };
-  cs_select(PICO_DEFAULT_SPI_CSN_PIN);
-  wr = spi_write_blocking(spi1, read_cmd2, 4);
-  cs_deselect(PICO_DEFAULT_SPI_CSN_PIN);
-  printf("Write returned: %d\n", wr);
-			
-  result=0;
-  cs_select(PICO_DEFAULT_SPI_CSN_PIN);
-  rr = spi_read_blocking(spi1, 0, (uint8_t *)&result, 4 );
-  cs_deselect(PICO_DEFAULT_SPI_CSN_PIN);
-  printf("Read result is 0x%04X, returned: 0x%08X\n", rr, result);
-#endif
 
 #if 0
 #define BUF_LEN 256
