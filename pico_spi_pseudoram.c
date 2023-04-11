@@ -1,3 +1,32 @@
+/*
+
+MIT Licence:
+
+Copyright 2023 Derek Fountain
+
+Permission is hereby granted, free of charge, to any person
+obtaining a copy of this software and associated documentation
+files (the "Software"), to deal in the Software without
+restriction, including without limitation the rights to use,
+copy, modify, merge, publish, distribute, sublicense, and/or
+sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
+
+*/
+
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
@@ -8,21 +37,13 @@
 #include "hardware/spi.h"
 #include "hardware/dma.h"
 
-const uint8_t LED_PIN        = PICO_DEFAULT_LED_PIN;
 const uint8_t TEST_OUTPUT_GP = 28;
 
 /* I'm using SPI1 for this test because it suits the project I have in mind */
-#define PICO_SPI_RX_PIN  12
-#define PICO_SPI_TX_PIN  15
-#define PICO_SPI_SCK_PIN 14
-#define PICO_SPI_CSN_PIN 13
-
-#define FLASH_CMD_STATUS       0x05
-#define FLASH_CMD_WRITE_EN     0x06
-#define FLASH_CMD_READ         0x03
-#define RAM_CMD_WRITE          0x02
-
-#define FLASH_STATUS_BUSY_MASK 0x01
+#define PICO_SPI_RX_PIN        12
+#define PICO_SPI_TX_PIN        15
+#define PICO_SPI_SCK_PIN       14
+#define PICO_SPI_CSN_PIN       13
 
 #define PRAM_CMD_WRITE         0x02
 #define PRAM_CMD_READ          0x03
@@ -30,7 +51,10 @@ const uint8_t TEST_OUTPUT_GP = 28;
 #define PRAM_CMD_RESET         0x99
 #define PRAM_CMD_READ_ID       0x9F
 
+/* Set this to get things working with the simple test */
 #define RUN_READ_ID_TEST       0
+
+
 
 static inline void cs_select(uint cs_pin) {
   gpio_put(cs_pin, 0);
@@ -40,62 +64,6 @@ static inline void cs_deselect(uint cs_pin) {
   gpio_put(cs_pin, 1);
 }
 
-#if 0
-void __not_in_flash_func(flash_write_enable)(spi_inst_t *spi, uint cs_pin) {
-    cs_select(cs_pin);
-    uint8_t cmd = FLASH_CMD_WRITE_EN;
-    spi_write_blocking(spi, &cmd, 1);
-    cs_deselect(cs_pin);
-}
-
-void __not_in_flash_func(flash_wait_done)(spi_inst_t *spi, uint cs_pin) {
-    uint8_t status;
-    do {
-        cs_select(cs_pin);
-        uint8_t buf[2] = {FLASH_CMD_STATUS, 0};
-        spi_write_read_blocking(spi, buf, buf, 2);
-        cs_deselect(cs_pin);
-        status = buf[1];
-    } while (status & FLASH_STATUS_BUSY_MASK);
-}
-
-void ram_read(spi_inst_t *spi, uint cs_pin, uint32_t addr, uint8_t *buf, size_t len) {
-    cs_select(cs_pin);
-
-    uint8_t cmdbuf[4] = {
-            FLASH_CMD_READ,
-            addr >> 16,
-            addr >> 8,
-            addr
-    };
-    spi_write_blocking(spi, cmdbuf, 4);
-    spi_read_blocking(spi, 0, buf, len);
-    cs_deselect(cs_pin);
-
-    //printf("\nram_read spi=%08X, addr=%08X, data = %02X, len=%d\n", spi, addr, *buf, len);
-}
-
-void ram_write(spi_inst_t *spi, uint cs_pin, uint32_t addr, uint8_t data[], size_t len)
-{
-
-  uint8_t cmdbuf[4] =
-    {
-     RAM_CMD_WRITE,
-     addr >> 16,
-     addr >> 8,
-     addr
-    };
-
-//  flash_write_enable(spi, cs_pin);
-  cs_select(cs_pin);
-  spi_write_blocking(spi, cmdbuf, 4);
-  spi_write_blocking(spi, data, len);
-  cs_deselect(cs_pin);
-  flash_wait_done(spi, cs_pin);
-  
-  //printf("\nram_write addr=%08X, data= %02X, len=%d\n", addr, data[0], len);
-}
-#endif
 
 int main()
 {
@@ -106,10 +74,8 @@ int main()
 
   printf("SPI test running...\n");
 
-  /* Just to show we're running */
-  gpio_init(LED_PIN);
-  gpio_set_dir(LED_PIN, GPIO_OUT);
-  gpio_put(LED_PIN, 1);
+  /* Test pin, shows on 'scope */
+  gpio_init(TEST_OUTPUT_GP); gpio_set_dir(TEST_OUTPUT_GP, GPIO_OUT); gpio_put(TEST_OUTPUT_GP, 0);
 
   /* AM wired these up for quad mode, leave off for now */
   gpio_init(16); gpio_set_dir( 16, GPIO_OUT ); gpio_pull_up( 16 ); gpio_put( 16, 1 );
@@ -137,6 +103,23 @@ int main()
   gpio_put(PICO_SPI_CSN_PIN, 1);   
 
 
+#if !RUN_READ_ID_TEST
+/*
+ * Create a big buffer, I want to see how long it takes to
+ * copy it to and from the RAM device
+ */
+#define BUF_LEN 1024*100
+  
+  uint8_t out_buf[BUF_LEN];
+  uint8_t in_buf[BUF_LEN];
+
+  for(size_t i = 0; i < BUF_LEN; i++)
+  {
+    out_buf[i] = i & 0xFF;
+    in_buf[i] = 0;
+  }
+#endif
+
   while( 1 )
   {
 #if RUN_READ_ID_TEST
@@ -158,6 +141,8 @@ int main()
 
     cs_deselect(PICO_SPI_CSN_PIN);
 #else
+
+    /* This test writes 0xAA, 0xBB, 0xCC, 0xDD into the RAM device... */
     cs_select(PICO_SPI_CSN_PIN);
 
     /* Write 4 data bytes into RAM at 0x000000 */
@@ -170,6 +155,7 @@ int main()
     cs_deselect(PICO_SPI_CSN_PIN);
 
 
+    /* ...and then reads it back again */
     cs_select(PICO_SPI_CSN_PIN);
 
     /* Read back 4 data bytes from 0x000000 */
@@ -183,33 +169,82 @@ int main()
     printf("Read result is 0x%04X, returned: 0x%08X\n", rr, result);
 
     cs_deselect(PICO_SPI_CSN_PIN);
+
+
+    /*
+     * This tests my particular use case which is to dump 100KB out
+     * to the RAM device, then read it back in again. I want to know
+     * how quickly it can do it
+     */
+    cs_select(PICO_SPI_CSN_PIN);
+
+    gpio_put( TEST_OUTPUT_GP, 1 );
+    __asm volatile ("nop");
+    __asm volatile ("nop");
+    __asm volatile ("nop");
+    __asm volatile ("nop");
+    gpio_put( TEST_OUTPUT_GP, 0 );
+
+    /* Write data buffer into RAM at 0x000000 */
+    uint8_t write_data_cmd[] = { PRAM_CMD_WRITE,
+				 0, 0, 0 };
+        wr = spi_write_blocking(spi1, write_data_cmd, sizeof(write_data_cmd));
+    int wd = spi_write_blocking(spi1, out_buf,        sizeof(out_buf));
+
+    gpio_put( TEST_OUTPUT_GP, 1 );
+    __asm volatile ("nop");
+    __asm volatile ("nop");
+    __asm volatile ("nop");
+    __asm volatile ("nop");
+    gpio_put( TEST_OUTPUT_GP, 0 );
+
+    printf("Write returned:      0x%04X\n", wr);
+    printf("Write data returned: 0x%04X\n", wd);
+
+    cs_deselect(PICO_SPI_CSN_PIN);
+
+    busy_wait_us_32(2000);
+
+    cs_select(PICO_SPI_CSN_PIN);
+
+#if 0
+    gpio_put( TEST_OUTPUT_GP, 1 );
+    __asm volatile ("nop");
+    __asm volatile ("nop");
+    __asm volatile ("nop");
+    __asm volatile ("nop");
+    gpio_put( TEST_OUTPUT_GP, 0 );
+#endif
+
+    spi_write_blocking(spi1, read_cmd, sizeof(read_cmd));
+    int rd = spi_read_blocking(spi1, 0, in_buf, sizeof(in_buf) ); 
+
+#if 0
+    gpio_put( TEST_OUTPUT_GP, 1 );
+    __asm volatile ("nop");
+    __asm volatile ("nop");
+    __asm volatile ("nop");
+    __asm volatile ("nop");
+    gpio_put( TEST_OUTPUT_GP, 0 );
+#endif
+
+    printf("Read data result is 0x%04X\n", rd);
+    cs_deselect(PICO_SPI_CSN_PIN);
+
+    uint8_t data_ok = 1;
+    for(size_t i = 0; i < BUF_LEN; i++)
+    {
+      if( out_buf[i] != in_buf[i] )
+      {
+	printf("Data mismatch at byte %i, 0x%02X != 0x%02X\n", i, out_buf[i], in_buf[i]);
+	data_ok = 0;
+      }
+    }
+    if( data_ok )
+      printf("Data read matches data written :)\n");
+
 #endif
     busy_wait_us_32(2000000);
 
   }
-
-#if 0
-#define BUF_LEN 256
-  
-  uint8_t out_buf[BUF_LEN], in_buf[BUF_LEN];
-
-  // Initialize output buffer
-  for (size_t i = 0; i < BUF_LEN; ++i) {
-    out_buf[i] = i;
-    in_buf[i] = 0;
-  }
-
-  printf("Writable: %d\n", spi_is_writable(spi1));
-
-
-  ram_write(spi1, PICO_DEFAULT_SPI_CSN_PIN, 0, out_buf, BUF_LEN);
-  ram_read(spi1, PICO_DEFAULT_SPI_CSN_PIN, 0, in_buf, BUF_LEN);
-
-  for( size_t i=0; i<16; i++ ) {
-    printf("%d) 0x%02X   \n",i,in_buf[i]);
-  }
-  printf("\n");
-#endif
-
-  while(1);
 }
