@@ -8,7 +8,7 @@ I needed more RAM on a Raspberry Pi Pico microcontroller, and figured the
 best way to get it was to install a pseuodo-SRAM device like
 [this one](https://www.mouser.co.uk/ProductDetail/AP-Memory/APS6404L-3SQR-SN?qs=IS%252B4QmGtzzqsn3S5xo%2FEEg%3D%3D),
 its datasheet is [here](https://www.mouser.co.uk/datasheet/2/1127/APM_PSRAM_QSPI_APS6404L_3SQR_v2_3_PKG-1954826.pdf).
-That particular one is an 8x1 Mbit device, so 1MB, but there are others in the
+That particular one is an 64 Mbit device, so 8MB, but there are others in the
 range.
 
 The idea is that a standard SRAM chip, fronted by an SPI interface,
@@ -111,11 +111,11 @@ Yellow line is the clock, and its frequency is 31.2MHz. So maybe you
 get a baudrate of half the frequency requested? There's a discussion
 [here](https://forums.raspberrypi.com/viewtopic.php?t=333214).
 
-That 31.2MHz clock was the best I could get on my breadboard setup.
-I wanted the full 84MHz the chip can do, but I think 31.2MHz is the limit
-for breadboard. Also, check your write/read results as you increase the
-baudrate because if you set it too high you get garbage back from the
-chip. It all seems to work but actually it doesn't.
+That 31.2MHz clock was the best I could get. I wanted the full 84MHz
+the chip can do, but I think 31.2MHz is the limit. Also, check your
+write/read results as you increase the baudrate because if you set
+it too high you get garbage back from the chip. It all seems to work
+but actually it doesn't.
 
 ### Performance
 
@@ -123,11 +123,10 @@ This is a 100KB block transfer in linear burst, fast read mode:
 
 ![alt text](Images/spi_read_100KB_62MHz_nooc.png "62MHz 100KB")
 
-About 35ms. The write was about the same. A better wiring setup (or
-a PCB) would improve the clock speed and get better performance. For
-comparison a 100KB read from the Pico's onboard flash is 9ms, but 
-doing the flash erase/write is about 600ms. (I needed better write
-performance, which is why I looked into this SPI RAM idea.)
+About 35ms. The write was about the same. For comparison a 100KB
+read from the Pico's onboard flash is 9ms, but  doing the flash
+erase/write is about 600ms. (I needed better write performance,
+which is why I looked into this SPI RAM idea.)
 
 This is a one byte read under the same circumstances:
 
