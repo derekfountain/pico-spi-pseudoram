@@ -109,7 +109,8 @@ thoroughly. Here's a 'scope shot of the clock when it's been set to
 
 Yellow line is the clock, and its frequency is 31.2MHz. So maybe you
 get a baudrate of half the frequency requested? There's a discussion
-[here](https://forums.raspberrypi.com/viewtopic.php?t=333214).
+[here](https://forums.raspberrypi.com/viewtopic.php?t=333214) and
+a plea to improve the documentation [here](https://github.com/raspberrypi/pico-feedback/issues/39)..
 
 That 31.2MHz clock was the best I could get. I wanted the full 84MHz
 the chip can do, but I think 31.2MHz is the limit. Also, check your
